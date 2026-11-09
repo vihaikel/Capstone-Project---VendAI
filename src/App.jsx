@@ -210,7 +210,9 @@ function App() {
             <div className='brand-name'>
               Vend<span>AI</span>
             </div>
-            <div className='brand-sub'>PROCUREMENT INTELLIGENCE</div>
+            <div className='brand-sub'>
+              SISTEM REKOMENDASI VENDOR BERBASIS AI
+            </div>
           </div>
         </div>
         <div className='workspace-label'>WORKSPACE</div>
