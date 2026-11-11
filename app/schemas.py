@@ -1,58 +1,37 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Literal
+from typing import Literal, Any
 
 # Request frontend
-class RecommendationRequest(BaseModel):
+class RiskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    min_financial_stability: float | None = Field(
-        default=None, ge=0, le=100
-    )
+    Financial_Stability_Score: float | None = Field(default=None, ge=0, le=100)
+    On_Time_Delivery_Rate: float | None = Field(default=None, ge=0, le=100)
+    Defect_Rate: float | None = Field(default=None, ge=0, le=10)
+    Lead_Time_Days: float | None = Field(default=None, ge=1)
+    Alternative_Suppliers_Available: float | None = Field(default=None, ge=0, le=10)
+    Contract_Length_Months: int | None = Field(default=None, ge=0)
+    Environmental_Compliance: int | None = Field(default=None, ge=0, le=100)
+    Previous_Disruptions: float | None = Field(default=None, ge=0, le=10)
 
-    min_on_time_delivery: float | None = Field(
-        default=None, ge=0, le=100
-    )
+class RiskResponse(BaseModel):
+    Risk_Score: float
+    Operasional_Buruk: bool
+    Teknis_Buruk: bool
+    Kriteria_Teknis_Gagal: str
+    Risk_Tier: Literal['Rendah', 'Sedang', 'Tinggi']
 
-    max_defect_rate: float | None = Field(
-        default=None, ge=0, le=10
-    )
+class VendorExplaination(BaseModel):
+    Supplier_ID: str
+    Rank: int | None = None
+    Risk_Score: float | None = None
+    risk_analysis: RiskResponse | None = None
+    Attributes: dict[str, Any] | None = None
 
-    max_geopolitical_risk: float | None = Field(
-        default=None, ge=0, le=100
-    )
+class GenerativeRequest(BaseModel):
+    supplier: list[VendorExplaination] = Field(min_length=1)
+    question: str | None = None
 
-    max_lead_time_days: float | None = Field(
-        default=None, ge=0
-    )
-
-    min_alternative_suppliers: int | None = Field(
-        default=None, ge=0
-    )
-
-    min_contract_length_months: int | None = Field(
-        default=None, ge=0
-    )
-
-    min_environmental_compliance: float | None = Field(
-        default=None, ge=0, le=100
-    )
-
-    max_previous_disruptions: int | None = Field(
-        default=None, ge=0
-    )
-
-    risk_level: Literal[0, 1] | None = None
-
-    top_n: int = Field(default=10, ge=1, le=100)
-
-# Satu hasil rekomendasi vendor
-class VendorRecomendation(BaseModel):
-    supplier_id: str
-    score: float
-    rank: int
-    risk_level: Literal[0,1]
-
-# Response backend
-class RecommendationResponse(BaseModel):
-    total_recommendations: int
-    recommendations: list[VendorRecomendation]
+class GenerativeResponse(BaseModel):
+    explanation: str
+    model: str
