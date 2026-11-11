@@ -1,2 +1,17 @@
 data/processed/
+# Virtual environment
+.venv/
+venv/
+source/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment variables
+*.env
+
+#OS
+.DS_Store
+.vscode/
 models/v1/
