@@ -53,7 +53,7 @@ def generate_explaination(supplier_data: list[dict], question: str | None = None
         contents = prompt,
         config = types.GenerateContentConfig(
             system_instruction = system_instruction,
-            temperature = 0.3
+            temperature = 0.2
         )
     )
 
