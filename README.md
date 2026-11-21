@@ -13,8 +13,287 @@ Gabungan kedua faktor menghasilkan **Risk Tier** (Rendah / Sedang / Tinggi) bese
 
 ## Daftar Isi
 
+**Bagian 1 — Setup Sistem**
+
+1. [Prasyarat](#prasyarat)
+2. [Instalasi Environment Python](#1-instalasi-environment-python)
+3. [Membuat Artefak Model (Notebook 01–06)](#2-membuat-artefak-model-notebook-0106)
+4. [Menyiapkan Database (PostgreSQL)](#3-menyiapkan-database-postgresql)
+5. [Konfigurasi Environment API (`api_key.env`)](#4-konfigurasi-environment-api-api_keyenv)
+6. [Menjalankan API (FastAPI)](#5-menjalankan-api-fastapi)
+7. [Menjalankan Frontend (React + Vite)](#6-menjalankan-frontend-react--vite)
+8. [Status Pengembangan](#status-pengembangan)
+
+**Bagian 2 — Penjelasan Proyek**
+
+1. [Gambaran Alur Sistem](#gambaran-alur-sistem)
+2. [Struktur Proyek](#struktur-proyek)
+3. [Dataset](#dataset)
+4. [Cara Kerja per Tahap](#cara-kerja-per-tahap)
+5. [Penentuan Risk Tier](#penentuan-risk-tier)
+6. [Ranking Vendor](#ranking-vendor)
+7. [Artefak Model](#artefak-model)
+8. [Alur Inferensi untuk Vendor Baru](#alur-inferensi-untuk-vendor-baru)
+9. [Keterbatasan dan Catatan](#keterbatasan-dan-catatan)
 
 ---
+
+# Bagian 1 — Setup Sistem
+
+## Prasyarat
+
+| Kebutuhan | Versi | Dipakai untuk |
+|---|---|---|
+| Python | **3.11** | Notebook, API, seeding database |
+| Node.js + npm | 18+ | Frontend (Vite) |
+| PostgreSQL | 12+ | Database vendor (`db/`), sumber data frontend |
+| Gemini API key | — | Endpoint penjelasan gen-AI (`/generate_explanation`) |
+
+> Gunakan Python 3.11. Artefak model di-pickle dengan **scikit-learn 1.7.0**, dan versi scikit-learn lain bisa gagal memuatnya (contoh: `ModuleNotFoundError: No module named '_loss'`).
+
+## 1. Instalasi Environment Python
+
+```bash
+git clone <url-repo>
+cd Capstone-Project---VendAI
+
+# pilih salah satu
+python -m venv .venv                      # venv
+conda create -n vendai python=3.11 -y     # atau conda
+
+# aktivasi
+.venv\Scripts\activate                    # Windows (venv)
+source .venv/bin/activate                 # macOS/Linux (venv)
+conda activate vendai                     # conda
+
+pip install -r requirements.txt
+```
+
+`requirements.txt` dikelompokkan per bagian: modelling (`notebooks/`), API (`app/`), dan seeding database (`db/seed.py`). Untuk menjalankan notebook, pasang juga Jupyter atau kernel (`pip install ipykernel`) jika belum ada.
+
+## 2. Membuat Artefak Model (Notebook 01–06)
+
+Folder `data/processed/` dan `models/v1/` **di-ignore git**, jadi setelah clone keduanya harus dibuat ulang dengan menjalankan notebook.
+
+1. Pastikan `data/raw/souvenir_vendor_dataset.csv` tersedia.
+2. Jalankan notebook secara berurutan, masing-masing dengan **Restart & Run All**:
+   `01_eda_data_quality` → `02_feature_engineering` → `03_modelling` → `04_risk_scoring` → `05_save_model` → `06_ranking`
+3. Pastikan semua `assert` di notebook 05 dan 06 lolos, dan `models/v1/` berisi:
+
+| File | Dibuat oleh | Dipakai oleh |
+|---|---|---|
+| `model_pipeline.pkl` | 03 | 04, 05 |
+| `risk_tier_config.json` | 04 | 05, `db/seed.py` |
+| `vendai_model.pkl` | 05 | 06, API |
+| `vendor_catalog_scored.csv` | 06 | API (ranking), `db/seed.py` |
+| `ranking_config.json` | 06 | API (ranking), `db/seed.py` |
+
+## 3. Menyiapkan Database (PostgreSQL)
+
+Database ini menjadi sumber data frontend (direktori, perbandingan, dan rekomendasi vendor). Prasyarat: notebook 01 dan 06 sudah dijalankan (butuh `data/processed/supplier_clean.csv` dan `models/v1/*`).
+
+```bash
+createdb -U postgres vendai
+psql -U postgres -d vendai -f db/schema.sql
+
+# Windows PowerShell: $env:DATABASE_URL="postgresql://user:pass@localhost:5432/vendai"; python db/seed.py
+DATABASE_URL=postgresql://user:pass@localhost:5432/vendai python db/seed.py
+```
+
+| Tabel | Diisi oleh |
+|---|---|
+| `vendors`, `vendor_items`, `model_versions`, `ranking_configs`, `vendor_risk_scores` | `db/seed.py` (dari hasil notebook) |
+| `users`, `recommendation_requests`, `recommendation_results`, `ai_explanations`, `procurement_orders`, `vendor_performance_log` | Aplikasi saat dipakai (awalnya kosong) |
+
+## 4. Konfigurasi Environment API (`api_key.env`)
+
+Buat file `api_key.env` di root proyek (sudah di-ignore oleh pola `*.env`):
+
+```env
+DATABASE_URL=postgresql://user:pass@localhost:5432/vendai
+GEMINI_API_KEY=isi_api_key_anda
+# opsional, default: gemini-3.8-flash
+GEMINI_MODEL=gemini-3.8-flash
+```
+
+`DATABASE_URL` dibaca oleh `app/db.py`, `GEMINI_*` oleh `app/services/gen_ai.py`. Jangan commit file ini ke repository.
+
+## 5. Menjalankan API (FastAPI)
+
+Jalankan dari **root proyek** (agar import `app.*` terbaca):
+
+```bash
+uvicorn app.main:app --reload
+```
+
+- Server: `http://127.0.0.1:8000`
+- Dokumentasi interaktif (Swagger): `http://127.0.0.1:8000/docs`
+
+### Endpoint
+
+| Method | Path | Fungsi |
+|---|---|---|
+| `GET` | `/health` | Cek server berjalan |
+| `GET` | `/categories` | Daftar kategori utama, sub-kategori, dan satuan (dari DB) |
+| `GET` | `/vendors` | Direktori vendor × item dari DB (filter, pencarian, sort, paginasi) |
+| `POST` | `/recommend` | Ranking vendor sesuai kebutuhan (logika `rank_vendors` notebook 06, dijalankan di SQL) |
+| `POST` | `/risk_analysis` | Menilai risiko satu vendor → `Risk_Score` dan `Risk_Tier` |
+| `POST` | `/generate_explanation` | Penjelasan hasil rekomendasi/ranking dalam bahasa Indonesia (Gemini) |
+
+### `GET /vendors`
+
+Query: `main_category` (opsional), `q` (cari `supplier_id`/`item_description`), `sort` = `score` (risiko terendah) / `price` / `lead_time`, `limit` (maks 200, default 50), `offset`.
+
+Bentuk response (nilai item hanya ilustrasi):
+
+```json
+{
+  "total": 36065,
+  "items": [
+    {
+      "item_id": 1, "supplier_id": "SUP_00001", "vendor_type": "Produsen/Pabrik",
+      "main_category": "Kustomisasi & Produksi", "sub_category": "Produksi Handuk Custom",
+      "item_description": "...", "unit": "pcs", "unit_price_idr": 12500, "moq": 100,
+      "capacity_per_week": 800, "lead_time_days": 3, "on_time_delivery_rate": 92,
+      "defect_rate": 1.2, "risk_score": 0.05, "risk_tier": "Rendah", "kriteria_teknis_gagal": []
+    }
+  ]
+}
+```
+
+### `POST /recommend`
+
+```json
+{
+  "main_category": "Kustomisasi & Produksi",
+  "sub_category": "Produksi Handuk Custom",
+  "quantity": 300,
+  "budget": 12000000,
+  "deadline_days": 21,
+  "vendor_type": null,
+  "top_k": 5
+}
+```
+
+Response: daftar item seperti `GET /vendors`, ditambah `rank`, `total_price`, dan `score`, diurutkan dari skor tertinggi. Aturan filter dan skor dijelaskan di [Ranking Vendor](#ranking-vendor); bobot dan tier yang dikecualikan dibaca dari `ranking_configs` yang aktif.
+
+### `POST /risk_analysis`
+
+Request: 8 fitur vendor. Semua field boleh `null` (diimputasi median data train). Field di luar 8 fitur ini **ditolak** (`extra="forbid"`).
+
+```json
+{
+  "Financial_Stability_Score": 72.5,
+  "On_Time_Delivery_Rate": 88,
+  "Defect_Rate": 1.8,
+  "Lead_Time_Days": 6,
+  "Alternative_Suppliers_Available": 3,
+  "Contract_Length_Months": 24,
+  "Environmental_Compliance": 80,
+  "Previous_Disruptions": 1
+}
+```
+
+| Field | Rentang valid |
+|---|---|
+| `Financial_Stability_Score`, `On_Time_Delivery_Rate`, `Environmental_Compliance` | 0–100 |
+| `Defect_Rate`, `Alternative_Suppliers_Available`, `Previous_Disruptions` | 0–10 |
+| `Lead_Time_Days` | ≥ 1 (skala 3–30 hari) |
+| `Contract_Length_Months` | ≥ 0 |
+
+Response:
+
+```json
+{
+  "Risk_Score": 0.0133,
+  "Operasional_Buruk": false,
+  "Teknis_Buruk": false,
+  "Kriteria_Teknis_Gagal": "",
+  "Risk_Tier": "Rendah"
+}
+```
+
+Arti setiap field dijelaskan di [Output per vendor](#output-per-vendor).
+
+### `POST /generate_explanation`
+
+Request: daftar vendor hasil ranking (minimal 1) dan pertanyaan opsional. Model diinstruksikan untuk tidak menghitung ulang skor atau mengubah urutan ranking.
+
+```json
+{
+  "supplier": [
+    {
+      "Supplier_ID": "SUP_02808",
+      "Rank": 1,
+      "Risk_Score": 0.05,
+      "Attributes": {"Unit_Price_IDR": 12500, "Lead_Time_Days": 3, "Risk_Tier": "Rendah"}
+    }
+  ],
+  "question": "Kenapa vendor ini direkomendasikan?"
+}
+```
+
+Response:
+
+```json
+{ "explanation": "Ringkasan rekomendasi: ...", "model": "gemini-3.8-flash" }
+```
+
+### Penanganan Error
+
+| Status | Kondisi |
+|---|---|
+| `422` | Body tidak valid: tipe salah, nilai di luar rentang, ada field tambahan, atau `supplier` kosong |
+| `503` | Database tidak dapat diakses / `DATABASE_URL` kosong, artefak model tidak ditemukan, atau Gemini tidak mengembalikan jawaban |
+| `502` | Pemanggilan Gemini gagal (API key salah, kuota habis, dsb.) |
+
+## 6. Menjalankan Frontend (React + Vite)
+
+```bash
+npm install
+npm run start:dev
+```
+
+Buka `http://localhost:5173`. Jalankan API (langkah 5) bersamaan, karena frontend mengambil data dari database lewat API: Vite meneruskan request `/api/*` ke `http://127.0.0.1:8000` (`vite.config.js`), dan semua pemanggilan API ada di `src/api.js`.
+
+| Halaman | Sumber data |
+|---|---|
+| Ringkasan | `GET /vendors` (total item & vendor risiko terendah) |
+| Rekomendasi AI | `GET /categories` + `POST /recommend` |
+| Direktori vendor | `GET /vendors` (filter, pencarian, sort, "Muat lebih banyak") |
+| Perbandingan | Vendor yang dipilih dari Direktori/Rekomendasi |
+| Pengadaan | Masih state lokal (belum disimpan ke DB) |
+
+Jika API atau database tidak berjalan, frontend menampilkan peringatan "Data vendor gagal dimuat".
+
+Build produksi: `npm run build` (output di `dist/`), pratinjau dengan `npm run preview`.
+
+## Status Pengembangan
+
+| Komponen | Status |
+|---|---|
+| Pipeline data & model (notebook 01–06) | ✅ Selesai: model, risk tier, dan ranking tervalidasi dengan `assert` |
+| `app/risk_scoring.py` | ✅ Selesai, dipakai notebook 04–06 |
+| Skema database & seeding (`db/`) | ✅ Selesai |
+| API `/health` | ✅ Berjalan |
+| API `/generate_explanation` | ✅ Terhubung ke Gemini (butuh `api_key.env`) |
+| API `/risk_analysis` (`app/services/rank_load.py`) | ⚠️ Belum tersambung ke artefak model, lihat catatan di bawah |
+| API `/categories`, `/vendors`, `/recommend` (`app/db.py`) | ✅ Membaca database PostgreSQL |
+| Frontend ↔ API | ✅ Ringkasan, Rekomendasi, Direktori, Perbandingan memakai data DB |
+| Halaman Pengadaan | ⏳ Masih state lokal; perlu tabel `users` terisi (login) untuk disimpan ke `procurement_orders` |
+| Kartu metrik dummy di Ringkasan | ⏳ "Rekomendasi tersedia" dan "Potensi penghematan" masih angka contoh |
+
+Hal yang perlu diperbaiki di `app/` agar `/risk_analysis` berjalan:
+
+- `rank_load.py` memuat `models/risk_model.pkl`, sedangkan artefak ada di `models/v1/vendai_model.pkl` (disimpan dengan `joblib`).
+- `rank_load.py` membaca key `rank_tier_config`, padahal key di artefak adalah `risk_tier_config`.
+- `assign_risk_tier` dipanggil dengan urutan argumen `(df, pipeline, config)`, padahal signature-nya `(pipeline, df, config)`.
+- Nama key response (`Operational_buruk`, `Teknis_buruk`) berbeda dengan output `assign_risk_tier` dan `RiskResponse` (`Operasional_Buruk`, `Teknis_Buruk`).
+- `main.py` memakai `status.HTTP_442_UNPROCESSABLE_ENTITY` (tidak ada); seharusnya `HTTP_422_UNPROCESSABLE_ENTITY`.
+
+---
+
+# Bagian 2 — Penjelasan Proyek
 
 ## Gambaran Alur Sistem
 
@@ -52,17 +331,32 @@ Secara ringkas:
 ```
 Capstone-Project---VendAI/
 ├── app/
-│   ├── main.py              # Endpoint FastAPI /recommend (masih stub)
-│   ├── ranking.py           # Logika ranking vendor (masih stub)
-│   ├── schemas.py           # Skema request/response API
-│   └── risk_scoring.py      # Logika penentuan Risk Tier (dipakai notebook & API)
+│   ├── main.py              # FastAPI: /health, /categories, /vendors, /recommend, /risk_analysis, /generate_explanation
+│   ├── schemas.py           # Skema request/response API (Pydantic)
+│   ├── risk_scoring.py      # Logika penentuan Risk Tier (dipakai notebook & API)
+│   ├── db.py                # Koneksi PostgreSQL (DATABASE_URL)
+│   └── services/
+│       ├── rank_load.py     # Memuat artefak model & prediksi risiko vendor
+│       └── gen_ai.py        # Penjelasan rekomendasi via Gemini (google-genai)
+├── db/
+│   ├── schema.sql           # Skema PostgreSQL (vendor, katalog, model, rekomendasi, order)
+│   └── seed.py              # Mengisi tabel referensi dari hasil notebook
+├── src/                     # Frontend React (Vite + Bootstrap)
+│   ├── App.jsx
+│   ├── api.js               # Pemanggilan API + mapping data DB ke komponen
+│   ├── components/          # Metric, Money, PageHeader, StatusBadge, VendorLogo
+│   └── pages/               # Overview, Vendors, Recommendations, Compare, Procurement
+├── index.html               # Entry point Vite
+├── vite.config.js           # Proxy /api → FastAPI
+├── package.json             # Dependency frontend
+├── api_key.env              # DATABASE_URL & GEMINI_API_KEY (dibuat sendiri, di-ignore git)
 ├── data/
 │   ├── raw/
 │   │   ├── supplier_risk_dataset.csv    # Dataset asli (generik)
 │   │   └── souvenir_vendor_dataset.csv  # Dataset souvenir/hampers (dataset raw, sintetis)
 │   └── processed/           # Output notebook 01 & 02 (di-ignore git)
 ├── models/
-│   └── v1/
+│   └── v1/                  # Artefak notebook 03–06 (di-ignore git)
 │       ├── model_pipeline.pkl      # Pipeline terlatih (notebook 03)
 │       ├── risk_tier_config.json   # Aturan Risk Tier (notebook 04)
 │       ├── vendai_model.pkl        # Artefak final untuk deploy (notebook 05)
@@ -220,7 +514,7 @@ Output: `models/v1/risk_tier_config.json`.
 ### 05 — Save Model (`05_save_model.ipynb`)
 
 1. Memuat pipeline (notebook 03) dan konfigurasi tier (notebook 04).
-2. Menghitung metrik final di data test: ROC-AUC 0,9345, F1 0,8934. Angka ini hampir identik dengan sebelum rescale `Lead_Time_Days` (0,9341 / 0,8925).
+2. Menghitung metrik final di data test: ROC-AUC 0,934, F1 0,892.
 3. Mengemas semuanya ke `models/v1/vendai_model.pkl`.
 4. **Verifikasi**: artefak dimuat ulang dari file, lalu dipastikan dengan `assert` bahwa prediksinya identik dengan pipeline asli.
 5. **Simulasi vendor baru**: tiga vendor fiktif dengan data mentah, nilai kosong, dan kolom tambahan (lead time dalam skala 3–30 hari). Hasilnya dipastikan dengan `assert` sesuai kriteria tier: Rendah, Sedang, Tinggi.
@@ -291,7 +585,7 @@ Kriteria teknis yang paling sering gagal: `Lead_Time_Days` (32,5%), `On_Time_Del
 
 ## Ranking Vendor
 
-Didefinisikan di `notebooks/06_ranking.ipynb`. Input berasal dari user website: kategori utama, sub-kategori, jumlah pesanan (`quantity`, dalam `Unit` item), budget total, sisa hari menuju acara (`deadline_days`), dan tipe vendor (opsional).
+Didefinisikan di `notebooks/06_ranking.ipynb`, dan logika yang sama dijalankan sebagai SQL oleh endpoint `POST /recommend` (`app/main.py`) di atas data database. Input berasal dari user website: kategori utama, sub-kategori, jumlah pesanan (`quantity`, dalam `Unit` item), budget total, sisa hari menuju acara (`deadline_days`), dan tipe vendor (opsional).
 
 ### Filter
 
@@ -336,15 +630,15 @@ Contoh: **produksi handuk custom 300 pcs, budget Rp12 juta, acara 21 hari lagi**
     'metadata': {
         'features': [...],       # 8 fitur, urutan sesuai saat training
         'model': 'HistGradientBoostingClassifier',
-        'metrics_test': {'roc_auc': 0.9345, 'f1': 0.8934},
-        'sklearn_version': '...',  # versi scikit-learn saat training
-        'python_version': '...',
-        'created': '...',
+        'metrics_test': {'roc_auc': 0.934, 'f1': 0.8916},
+        'sklearn_version': '1.7.0',
+        'python_version': '3.11.16',
+        'created': '2026-11-17',
     },
 }
 ```
 
-File `.pkl` hanya dapat dimuat dengan versi scikit-learn yang kompatibel. Gunakan versi yang tercatat di `metadata['sklearn_version']`.
+File `.pkl` hanya dapat dimuat dengan versi scikit-learn yang kompatibel. Gunakan versi yang tercatat di `metadata['sklearn_version']` (sudah di-pin di `requirements.txt`).
 
 ---
 
@@ -375,63 +669,3 @@ Syarat data `vendor_df`:
 - **Fitur item bersifat sintetis.** Tipe vendor, kategori, harga, MOQ, dan kapasitas dibuat sintetis saat penyusunan dataset agar sistem ranking bisa didemokan. Sebelum dipakai nyata, ganti dengan data katalog vendor asli dengan format kolom yang sama.
 - **Ranking per item.** Satu query merekomendasikan vendor untuk satu sub-kategori. Kebutuhan satu paket hampers (misalnya handuk + box + kartu ucapan) dilakukan dengan beberapa query.
 - **Proporsi tier Rendah terbatas.** Sekitar 64% vendor test dinilai operasionalnya kurang baik, karena 70% data berlabel berisiko. `operational_threshold` dapat dinaikkan jika tier Rendah dirasa terlalu sedikit.
-
----
-
-## Menjalankan Ulang Pipeline Training
-
-1. Siapkan environment (Python 3.11):
-   ```bash
-   pip install -r requirement.txt
-   ```
-2. Jalankan notebook secara berurutan, masing-masing dengan **Restart & Run All**:
-   `01_eda_data_quality` → `02_feature_engineering` → `03_modelling` → `04_risk_scoring` → `05_save_model` → `06_ranking`
-3. Pastikan `models/v1/` berisi `model_pipeline.pkl`, `risk_tier_config.json`, `vendai_model.pkl`, `vendor_catalog_scored.csv`, dan `ranking_config.json`, dan semua `assert` di notebook 05 dan 06 lolos. Pastikan `data/raw/souvenir_vendor_dataset.csv` tersedia sebelum menjalankan notebook 01.
-
----
-
-## Cara Menggunakan Sistem Rekomendasi
-
-> Bagian ini akan dilengkapi setelah lapisan API (`app/`) tersambung ke `models/v1/vendai_model.pkl`.
-
-### Instalasi
-
-<!-- TODO: dependency tambahan untuk API (mis. fastapi, uvicorn) dan langkah instalasi -->
-
-&nbsp;
-
-### Menjalankan Server
-
-<!-- TODO: perintah menjalankan API -->
-
-&nbsp;
-
-### Endpoint
-
-<!-- TODO: daftar endpoint, method, dan deskripsinya -->
-
-&nbsp;
-
-### Format Request
-
-<!-- TODO: contoh body request dan penjelasan setiap field -->
-
-&nbsp;
-
-### Format Response
-
-<!-- TODO: contoh response dan arti setiap field (Risk_Score, Risk_Tier, Kriteria_Teknis_Gagal, rank, dll.) -->
-
-&nbsp;
-
-### Contoh Penggunaan
-
-<!-- TODO: contoh pemanggilan dari frontend / curl / Postman -->
-
-&nbsp;
-
-### Penanganan Error
-
-<!-- TODO: respons untuk input tidak valid, kolom hilang, dsb. -->
-
-&nbsp;

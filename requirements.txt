@@ -1,11 +1,19 @@
+# Python 3.11 — model di models/ di-pickle dengan scikit-learn 1.7.0; jangan ubah versi ini tanpa retrain.
+
+# Modelling (notebooks/)
 pandas==2.1.4
+numpy==1.26.4
 scikit-learn==1.7.0
+joblib==1.3.2
 matplotlib==3.7.5
 seaborn==0.13.2
-numpy==1.26.4
-joblib==1.3.2
+
+# API (app/)
 fastapi==0.115.12
-pydantic==2.11.7
-uvicorn[standard]==0.34.3
+uvicorn[standard]==0.34.2
+pydantic==2.11.4
 python-dotenv==1.1.0
-google-genai==1.20.0
+google-genai==1.16.1
+
+# Database seeding (db/seed.py)
+psycopg[binary]==3.2.9
