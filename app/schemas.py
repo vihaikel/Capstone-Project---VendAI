@@ -32,6 +32,15 @@ class GenerativeRequest(BaseModel):
     supplier: list[VendorExplaination] = Field(min_length=1)
     question: str | None = None
 
+class RecommendRequest(BaseModel):
+    main_category: Literal['Bahan Baku', 'Kustomisasi & Produksi', 'Packaging']
+    sub_category: str
+    quantity: int = Field(gt=0)
+    budget: float = Field(gt=0)
+    deadline_days: int | None = Field(default=None, gt=0)
+    vendor_type: str | None = None
+    top_k: int = Field(default=5, ge=1, le=50)
+
 class GenerativeResponse(BaseModel):
     explanation: str
     model: str

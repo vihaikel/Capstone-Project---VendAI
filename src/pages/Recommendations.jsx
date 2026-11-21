@@ -1,37 +1,77 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader.jsx';
 import VendorLogo from '../components/VendorLogo.jsx';
 import { money } from '../components/Money.jsx';
+import { recommend } from '../api.js';
+
+const PRIORITIES = [
+  { label: 'Seimbang', icon: 'bi-stars', desc: 'Skor risiko, harga & lead time' },
+  { label: 'Harga terendah', icon: 'bi-wallet2', desc: 'Optimalkan biaya' },
+  { label: 'Kualitas', icon: 'bi-award', desc: 'Defect rate terendah' },
+  { label: 'Pengiriman tercepat', icon: 'bi-truck', desc: 'Lead time terpendek' },
+];
 
 function Recommendations({
+  categories,
   need,
   setNeed,
   budget,
   setBudget,
   priority,
   setPriority,
-  searched,
-  setSearched,
-  vendors,
   selected,
   toggleVendor,
   setPage,
   notify,
   setDetail,
 }) {
-  const matches = vendors
-    .filter((v) => v.category === need)
-    .sort((a, b) => {
-      if (priority === 'Harga terendah') return a.price - b.price;
-      if (priority === 'Kualitas') return b.quality - a.quality;
-      if (priority === 'Pengiriman tercepat')
-        return parseInt(a.delivery) - parseInt(b.delivery);
-      return b.score - a.score;
-    });
-  const doSearch = () => {
-    setSearched(true);
-    notify('Rekomendasi diperbarui berdasarkan kriteria Anda.');
-  };
+  const mainCategories = [...new Set(categories.map((c) => c.main_category))];
+  const subCategories = categories.filter((c) => c.main_category === need);
+  const [sub, setSub] = useState('');
+  const [quantity, setQuantity] = useState('300');
+  const [deadline, setDeadline] = useState('21');
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // Pilih sub-kategori pertama saat kategori berganti / data kategori baru dimuat.
+  useEffect(() => {
+    if (!subCategories.some((c) => c.sub_category === sub))
+      setSub(subCategories[0]?.sub_category || '');
+  }, [need, categories]);
+
+  const unit = subCategories.find((c) => c.sub_category === sub)?.unit || 'pcs';
+
+  // Skor server = urutan "Seimbang"; prioritas lain hanya mengurutkan ulang hasil.
+  const matches = [...(results || [])].sort((a, b) => {
+    if (priority === 'Harga terendah') return a.price - b.price;
+    if (priority === 'Kualitas') return b.quality - a.quality;
+    if (priority === 'Pengiriman tercepat') return a.leadTime - b.leadTime;
+    return a.rank - b.rank;
+  });
+
+  async function doSearch() {
+    setLoading(true);
+    try {
+      const rows = await recommend({
+        main_category: need,
+        sub_category: sub,
+        quantity: Number(quantity),
+        budget: Number(budget),
+        deadline_days: deadline ? Number(deadline) : null,
+      });
+      setResults(rows);
+      notify(
+        rows.length
+          ? 'Rekomendasi diperbarui berdasarkan kriteria Anda.'
+          : 'Tidak ada vendor yang memenuhi kriteria.',
+      );
+    } catch (e) {
+      notify(`Gagal memuat rekomendasi: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -42,7 +82,7 @@ function Recommendations({
             <span className='title-accent'>yang paling cocok.</span>
           </>
         }
-        subtitle='Jelaskan kebutuhan Anda. VendAI membantu menyusun shortlist berdasarkan kriteria pengadaan.'
+        subtitle='Jelaskan kebutuhan Anda. VendAI menyusun shortlist berdasarkan risiko, harga, dan lead time vendor.'
         action={
           <span className='ai-status'>
             <span></span> AI Assistant aktif
@@ -66,13 +106,37 @@ function Recommendations({
             value={need}
             onChange={(e) => {
               setNeed(e.target.value);
-              setSearched(false);
+              setResults(null);
             }}
           >
-            <option>Bahan baku</option>
-            <option>Perlengkapan</option>
-            <option>Logistik</option>
+            {mainCategories.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
           </select>
+          <label className='form-label mt-4'>Produk / jasa</label>
+          <select
+            className='form-select'
+            value={sub}
+            onChange={(e) => {
+              setSub(e.target.value);
+              setResults(null);
+            }}
+          >
+            {subCategories.map((c) => (
+              <option key={c.sub_category}>{c.sub_category}</option>
+            ))}
+          </select>
+          <label className='form-label mt-4'>Jumlah pesanan</label>
+          <div className='input-group budget-input'>
+            <input
+              className='form-control'
+              type='number'
+              min='1'
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
+            <span className='input-group-text'>{unit}</span>
+          </div>
           <label className='form-label mt-4'>Anggaran maksimum</label>
           <div className='input-group budget-input'>
             <span className='input-group-text'>Rp</span>
@@ -85,30 +149,21 @@ function Recommendations({
             />
           </div>
           <div className='form-hint'>Anggaran total untuk kebutuhan ini.</div>
+          <label className='form-label mt-4'>Sisa hari menuju acara</label>
+          <div className='input-group budget-input'>
+            <input
+              className='form-control'
+              type='number'
+              min='1'
+              placeholder='Kosongkan bila tanpa deadline'
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+            />
+            <span className='input-group-text'>hari</span>
+          </div>
           <label className='form-label mt-4'>Prioritas utama</label>
           <div className='priority-options'>
-            {[
-              {
-                label: 'Seimbang',
-                icon: 'bi-stars',
-                desc: 'Nilai keseluruhan',
-              },
-              {
-                label: 'Harga terendah',
-                icon: 'bi-wallet2',
-                desc: 'Optimalkan biaya',
-              },
-              {
-                label: 'Kualitas',
-                icon: 'bi-award',
-                desc: 'Utamakan kualitas',
-              },
-              {
-                label: 'Pengiriman tercepat',
-                icon: 'bi-truck',
-                desc: 'Hemat waktu',
-              },
-            ].map((p) => (
+            {PRIORITIES.map((p) => (
               <button
                 key={p.label}
                 className={`priority-option ${priority === p.label ? 'chosen' : ''}`}
@@ -128,12 +183,14 @@ function Recommendations({
           <button
             className='btn btn-primary-custom w-100 mt-4'
             onClick={doSearch}
+            disabled={loading || !sub || !quantity || !budget}
           >
-            <i className='bi bi-stars me-2'></i>Generate rekomendasi
+            <i className='bi bi-stars me-2'></i>
+            {loading ? 'Memproses...' : 'Generate rekomendasi'}
           </button>
           <div className='privacy-note'>
-            <i className='bi bi-shield-check'></i> Hasil demo menggunakan data
-            vendor contoh.
+            <i className='bi bi-shield-check'></i> Vendor berisiko Tinggi
+            otomatis dikecualikan.
           </div>
         </div>
         <div className='results-column'>
@@ -143,14 +200,14 @@ function Recommendations({
             </div>
             <div>
               <strong>
-                {searched
+                {results
                   ? 'Analisis selesai. Ini shortlist Anda.'
                   : 'Siap menemukan vendor terbaik?'}
               </strong>
               <p>
-                {searched
-                  ? `Prioritas “${priority}” diterapkan untuk kategori ${need.toLowerCase()}.`
-                  : 'AI mengevaluasi kecocokan kategori, anggaran, rating, kualitas, dan performa pengiriman.'}
+                {results
+                  ? `Prioritas “${priority}” diterapkan untuk ${sub} (${quantity} ${unit}).`
+                  : 'VendAI menyaring vendor berdasarkan MOQ, anggaran, kapasitas, dan deadline, lalu mengurutkan berdasarkan risiko, harga, dan lead time.'}
               </p>
             </div>
             <div className='ai-pulse'>
@@ -175,6 +232,13 @@ function Recommendations({
               {selected.length})
             </button>
           </div>
+          {results && matches.length === 0 && (
+            <div className='panel empty-state'>
+              <i className='bi bi-search'></i>
+              <h4>Tidak ada vendor yang cocok</h4>
+              <p>Coba naikkan anggaran, kurangi jumlah, atau perpanjang deadline.</p>
+            </div>
+          )}
           {matches.map((v, i) => (
             <div
               className={`recommend-card ${i === 0 ? 'top-match' : ''}`}
@@ -184,20 +248,22 @@ function Recommendations({
                 <VendorLogo vendor={v} />
                 <div className='recommend-vendor-name'>
                   <div className='d-flex align-items-center gap-2 flex-wrap'>
-                    <h4>{v.name}</h4>
+                    <h4>
+                      #{v.rank} {v.name}
+                    </h4>
                     {v.verified && (
                       <span className='verified-label'>
-                        <i className='bi bi-patch-check-fill'></i> Terverifikasi
+                        <i className='bi bi-patch-check-fill'></i> Risiko rendah
                       </span>
                     )}
                   </div>
                   <span>
-                    {v.category} <i className='bi bi-dot'></i> {v.location}
+                    {v.subCategory} <i className='bi bi-dot'></i> {v.location}
                   </span>
                 </div>
                 <div className='match-score'>
                   <strong>{v.score}</strong>
-                  <span>AI match</span>
+                  <span>skor</span>
                 </div>
               </div>
               <div className='match-progress'>
@@ -206,20 +272,22 @@ function Recommendations({
               <p className='recommend-desc'>{v.description}</p>
               <div className='vendor-stats'>
                 <div>
-                  <span>Estimasi biaya</span>
+                  <span>Total biaya</span>
                   <strong>{money(v.price)}</strong>
+                  <small>
+                    {money(v.unitPrice)}/{v.unit}
+                  </small>
                 </div>
                 <div>
-                  <span>Pengiriman</span>
+                  <span>Lead time</span>
                   <strong>
                     <i className='bi bi-truck'></i> {v.delivery}
                   </strong>
                 </div>
                 <div>
-                  <span>Rating</span>
+                  <span>Risk tier</span>
                   <strong>
-                    <i className='bi bi-star-fill star'></i> {v.rating}{' '}
-                    <small>({v.onTime}% tepat waktu)</small>
+                    {v.riskTier} <small>({v.onTime}% tepat waktu)</small>
                   </strong>
                 </div>
               </div>
@@ -235,7 +303,7 @@ function Recommendations({
                 <div className='recommend-actions'>
                   <button
                     className={`btn btn-sm ${selected.includes(v.id) ? 'btn-selected' : 'btn-outline-custom'}`}
-                    onClick={() => toggleVendor(v.id)}
+                    onClick={() => toggleVendor(v)}
                   >
                     <i
                       className={`bi ${selected.includes(v.id) ? 'bi-check2' : 'bi-plus-lg'} me-1`}
@@ -255,9 +323,9 @@ function Recommendations({
           <div className='disclaimer'>
             <i className='bi bi-info-circle'></i>
             <span>
-              Skor dan estimasi pada halaman ini merupakan data simulasi untuk
-              prototipe. Keputusan akhir tetap memerlukan verifikasi penawaran
-              dan dokumen vendor.
+              Skor dihitung dari model risiko dan katalog vendor di database.
+              Keputusan akhir tetap memerlukan verifikasi penawaran dan dokumen
+              vendor.
             </span>
           </div>
         </div>

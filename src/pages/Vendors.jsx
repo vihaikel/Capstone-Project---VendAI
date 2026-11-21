@@ -1,10 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import PageHeader from '../components/PageHeader.jsx';
 import VendorLogo from '../components/VendorLogo.jsx';
 import { money } from '../components/Money.jsx';
 
 function Vendors({
   vendors,
+  vendorTotal,
+  loading,
+  loadMore,
+  mainCategories,
   query,
   setQuery,
   category,
@@ -45,7 +49,7 @@ function Vendors({
             <i className='bi bi-search'></i>
             <input
               className='form-control'
-              placeholder='Cari nama vendor atau lokasi...'
+              placeholder='Cari ID vendor atau deskripsi item...'
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -56,27 +60,28 @@ function Vendors({
             onChange={(e) => setCategory(e.target.value)}
           >
             <option>Semua kategori</option>
-            <option>Bahan baku</option>
-            <option>Perlengkapan</option>
-            <option>Logistik</option>
+            {mainCategories.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
           </select>
           <select
             className='form-select filter-select'
             value={sort}
             onChange={(e) => setSort(e.target.value)}
           >
-            <option value='score'>Skor AI tertinggi</option>
-            <option value='price'>Harga terendah</option>
-            <option value='rating'>Rating tertinggi</option>
+            <option value='score'>Risiko terendah</option>
+            <option value='price'>Harga satuan terendah</option>
+            <option value='lead_time'>Lead time tercepat</option>
           </select>
         </div>
         <div className='directory-summary'>
           <span>
-            <b>{vendors.length}</b> vendor ditemukan
+            <b>{vendorTotal.toLocaleString('id-ID')}</b> item vendor ditemukan
+            {vendorTotal > vendors.length && ` (menampilkan ${vendors.length})`}
           </span>
           <span>
-            <i className='bi bi-check-circle-fill text-success me-1'></i>Data
-            demo diperbarui
+            <i className='bi bi-database-check text-success me-1'></i>
+            {loading ? 'Memuat data...' : 'Data dari database'}
           </span>
         </div>
         <div className='table-responsive'>
@@ -85,8 +90,8 @@ function Vendors({
               <tr>
                 <th>VENDOR</th>
                 <th>KATEGORI</th>
-                <th>RATING</th>
-                <th>ESTIMASI BIAYA</th>
+                <th>RISK TIER</th>
+                <th>HARGA SATUAN</th>
                 <th>AI SCORE</th>
                 <th></th>
               </tr>
@@ -112,14 +117,14 @@ function Vendors({
                     </div>
                   </td>
                   <td>
-                    <span className='category-chip'>{v.category}</span>
+                    <span className='category-chip'>{v.subCategory}</span>
                   </td>
                   <td>
-                    <span className='rating-value'>
-                      <i className='bi bi-star-fill star'></i> {v.rating}
-                    </span>
+                    <span className='rating-value'>{v.riskTier}</span>
                   </td>
-                  <td className='fw-semibold'>{money(v.price)}</td>
+                  <td className='fw-semibold'>
+                    {money(v.unitPrice)}/{v.unit}
+                  </td>
                   <td>
                     <div className='table-score'>
                       <b>{v.score}</b>
@@ -140,7 +145,7 @@ function Vendors({
                       <button
                         className={`icon-button ${selected.includes(v.id) ? 'selected-action' : ''}`}
                         title='Pilih untuk perbandingan'
-                        onClick={() => toggleVendor(v.id)}
+                        onClick={() => toggleVendor(v)}
                       >
                         <i
                           className={`bi ${selected.includes(v.id) ? 'bi-check-square-fill' : 'bi-plus-square'}`}
@@ -153,7 +158,14 @@ function Vendors({
             </tbody>
           </table>
         </div>
-        {vendors.length === 0 && (
+        {vendors.length < vendorTotal && (
+          <div className='text-center my-3'>
+            <button className='btn btn-outline-custom' onClick={loadMore}>
+              Muat lebih banyak
+            </button>
+          </div>
+        )}
+        {!loading && vendors.length === 0 && (
           <div className='empty-state'>
             <i className='bi bi-search'></i>
             <h4>Vendor tidak ditemukan</h4>
