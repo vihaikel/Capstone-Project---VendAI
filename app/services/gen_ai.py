@@ -16,7 +16,7 @@ def model_gemini():
     api_key = os.getenv("GEMINI_API_KEY")
     return genai.Client(api_key = api_key)
 
-def generate_explaination(supplier_data: list[dict], question: str | None = None):
+def generate_explaination(supplier_data: list[dict], procurement_request: dict, question: str | None = None):
     client = model_gemini()
     system_instruction = """
     Kamu adaklah asisten AI yang membantu menjelaskan hasil analisis risiko vendor.
@@ -43,17 +43,21 @@ def generate_explaination(supplier_data: list[dict], question: str | None = None
     - Pertimbangan sebelum mengambil keputusan"""
 
     prompt = f"""
+    Berikut data permintaan pengadaan: {json.dumps(procurement_request, indent=2, ensure_ascii=False)}
+
     Berikut data hasil rekomendasi vendor: {json.dumps(supplier_data, indent=2, ensure_ascii=False)}
 
-    Pertanyaan pengguna: {question or "Jelaskan hasil rekomendasi vendor berdasarkan data."}
-    Berikan jawaban sesuai aturan dan format yang telah ditentukan di atas."""
+    Pertanyaan tambahan dari pengguna:
+    {question if question else "Tidak ada pertanyaan tambahan. Berikan penjelasan rekomendasi vendor berdasarkan data yang tersedia."}
+    
+    Berikan jawaban sesuai aturan dan format yang telah diberikan di system_instruction."""
 
     response = client.models.generate_content(
         model = model_name,
         contents = prompt,
         config = types.GenerateContentConfig(
             system_instruction = system_instruction,
-            temperature = 0.3
+            temperature = 0.2
         )
     )
 

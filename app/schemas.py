@@ -21,15 +21,42 @@ class RiskResponse(BaseModel):
     Kriteria_Teknis_Gagal: str
     Risk_Tier: Literal['Rendah', 'Sedang', 'Tinggi']
 
-class VendorExplaination(BaseModel):
+class ProcurementRequest(BaseModel):
+    main_category: str
+    sub_category: str
+    quantity: float = Field(gt=0)
+    budget: float = Field(gt=0)
+    deadline_days: int | None = Field(default=None, gt=0)
+
+class VendorExplanation(BaseModel):
+    Rank: int
     Supplier_ID: str
-    Rank: int | None = None
+
+    Vendor_Type: str | None = None
+    Main_Category: str | None = None
+    Sub_Category: str | None = None
+    Item_Description: str | None = None
+    Unit: str | None = None
+
+    Unit_Price_IDR: float | None = None
+    MOQ: float | None = None
+    Total_Price: float | None = None
+
+    Capacity_Per_Week: float | None = None
+    Capacity_Per_Month: float | None = None
+    Lead_Time_Days: float | None = None
+
     Risk_Score: float | None = None
-    risk_analysis: RiskResponse | None = None
-    Attributes: dict[str, Any] | None = None
+    Operasional_Buruk: bool | None = None
+    Teknis_Buruk: bool | None = None
+    Kriteria_Teknis_Gagal: str | None = None
+    Risk_Tier: Literal["Rendah", "Sedang", "Tinggi"] | None = None
+
+    Score: float | None = None
 
 class GenerativeRequest(BaseModel):
-    supplier: list[VendorExplaination] = Field(min_length=1)
+    procurement_request: ProcurementRequest
+    supplier: list[VendorExplanation] = Field(min_length=1)
     question: str | None = None
 
 class RecommendRequest(BaseModel):
