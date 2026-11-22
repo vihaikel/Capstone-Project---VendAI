@@ -151,35 +151,6 @@ def generate_explanation(request: GenerativeRequest):
         logger.exception("Gemini gagal menghasilkan penjelasan")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Gagal menghasilkan penjelasan. Silakan coba lagi nanti.")
 
-# Response Rekomendasi Vendor
-@app.post("/recommendations", response_model = RecommendationResponse)
-def recommendations(request: RecommendationRequest):
-    try:
-        result = get_recommendations(
-            main_category=request.main_category,
-            sub_category=request.sub_category,
-            quantity=request.quantity,
-            budget=request.budget,
-            deadline_days=request.deadline_days,
-            vendor_type=request.vendor_type,
-            top_k=request.top_k,
-        )
-        result = result.astype(object).where(result.notna(), None)
-        suppliers = result.to_dict(orient="records")
-
-        return {"total": len(suppliers), "suppliers": suppliers}
-
-    except FileNotFoundError as e:
-        logger.exception("File data ranking tidak ditemukan")
-        raise HTTPException(status_code=503, detail="Data supplier atau konfigurasi ranking belum tersedia.")
-
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-
-    except Exception:
-        logger.exception("Gagal menjalankan ranking supplier")
-        raise HTTPException(status_code=500, detail="Terjadi kesalahan saat memproses rekomendasi supplier.")
-
 # Response Procurement Flow (dari user)
 @app.post("/procurement", response_model = ProcurementFlowResponse)
 def procurement(request: ProcurementFlowRequest):
