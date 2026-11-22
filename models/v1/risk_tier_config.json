@@ -1,0 +1,28 @@
+{
+  "operational_threshold": 0.5,
+  "min_tech_fails": 2,
+  "tech_rules": {
+    "On_Time_Delivery_Rate": {
+      "op": "<",
+      "value": 80
+    },
+    "Defect_Rate": {
+      "op": ">",
+      "value": 3.5
+    },
+    "Lead_Time_Days": {
+      "op": ">",
+      "value": 10
+    },
+    "Previous_Disruptions": {
+      "op": ">=",
+      "value": 2
+    }
+  },
+  "tech_medians": {
+    "On_Time_Delivery_Rate": 84.5,
+    "Defect_Rate": 2.0,
+    "Lead_Time_Days": 8.0,
+    "Previous_Disruptions": 1.0
+  }
+}

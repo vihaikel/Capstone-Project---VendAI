@@ -89,7 +89,7 @@ def vendors(main_category: str | None = None, q: str | None = None,
 
 
 @app.post("/recommend")
-def recommend(req: RecommendRequest):
+def recommend(req: RecommendationRequest):
     # Port rank_vendors (notebooks/06_ranking.ipynb): filter lalu skor
     # w_risk*(1-risk) + w_price*inv_minmax(harga) + w_lead*inv_minmax(lead time)
     return db(f"""

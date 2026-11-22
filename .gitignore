@@ -14,7 +14,6 @@ __pycache__/
 #OS
 .DS_Store
 .vscode/
-models/v1/
 
 node_modules/
 dist/
