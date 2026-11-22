@@ -1,0 +1,10 @@
+{
+  "weights": {
+    "risk": 0.5,
+    "price": 0.3,
+    "lead_time": 0.2
+  },
+  "exclude_tiers": [
+    "Tinggi"
+  ]
+}

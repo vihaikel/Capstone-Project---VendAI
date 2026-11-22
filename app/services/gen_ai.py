@@ -27,7 +27,7 @@ client = genai.Client(api_key = api_key)
 
 def generate_explaination(supplier_data: list[dict], procurement_request: dict, question: str | None = None):
     system_instruction = """
-    Kamu adaklah asisten AI yang membantu menjelaskan hasil analisis risiko vendor.
+    Kamu adalah asisten AI yang membantu menjelaskan hasil analisis risiko vendor.
     
     Tugasmu adalah menjelaskan hasil rekomendasi dan ranking vendor berdasarkan data yang diberikan.
     
