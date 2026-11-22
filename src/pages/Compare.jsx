@@ -76,7 +76,7 @@ function Compare({ selectedVendors, toggleVendor, vendors, setPage, notify }) {
                       <div className='compare-vendor-head'>
                         <VendorLogo vendor={v} />
                         <strong>{v.name}</strong>
-                        <button onClick={() => toggleVendor(v.id)}>
+                        <button onClick={() => toggleVendor(v)}>
                           <i className='bi bi-x-circle'></i> Hapus
                         </button>
                       </div>
@@ -88,21 +88,23 @@ function Compare({ selectedVendors, toggleVendor, vendors, setPage, notify }) {
                 {(!metric || metric === 'all' || metric === 'commercial') && (
                   <>
                     <tr>
-                      <td>Estimasi biaya</td>
+                      <td>Harga satuan</td>
                       {selectedVendors.map((v) => (
                         <td
                           key={v.id}
                           className={
-                            v.price ===
-                            Math.min(...selectedVendors.map((x) => x.price))
+                            v.unitPrice ===
+                            Math.min(...selectedVendors.map((x) => x.unitPrice))
                               ? 'best-cell'
                               : ''
                           }
                         >
-                          <strong>{money(v.price)}</strong>
-                          {v.price ===
+                          <strong>
+                            {money(v.unitPrice)}/{v.unit}
+                          </strong>
+                          {v.unitPrice ===
                             Math.min(
-                              ...selectedVendors.map((x) => x.price),
+                              ...selectedVendors.map((x) => x.unitPrice),
                             ) && (
                             <small>
                               <i className='bi bi-check-circle-fill'></i>{' '}
@@ -113,7 +115,7 @@ function Compare({ selectedVendors, toggleVendor, vendors, setPage, notify }) {
                       ))}
                     </tr>
                     <tr>
-                      <td>Waktu pengiriman</td>
+                      <td>Lead time</td>
                       {selectedVendors.map((v) => (
                         <td key={v.id}>{v.delivery}</td>
                       ))}
@@ -123,7 +125,7 @@ function Compare({ selectedVendors, toggleVendor, vendors, setPage, notify }) {
                 {(!metric || metric === 'all' || metric === 'performance') && (
                   <>
                     <tr>
-                      <td>AI match score</td>
+                      <td>Skor (1 − risk score)</td>
                       {selectedVendors.map((v) => (
                         <td key={v.id}>
                           <div className='compare-score'>
@@ -136,11 +138,11 @@ function Compare({ selectedVendors, toggleVendor, vendors, setPage, notify }) {
                       ))}
                     </tr>
                     <tr>
-                      <td>Rating pengguna</td>
+                      <td>Risk tier</td>
                       {selectedVendors.map((v) => (
                         <td key={v.id}>
-                          <i className='bi bi-star-fill star'></i>{' '}
-                          <strong>{v.rating}</strong> / 5
+                          <strong>{v.riskTier}</strong>{' '}
+                          <small>({v.riskScore.toFixed(3)})</small>
                         </td>
                       ))}
                     </tr>
@@ -156,7 +158,7 @@ function Compare({ selectedVendors, toggleVendor, vendors, setPage, notify }) {
                       ))}
                     </tr>
                     <tr>
-                      <td>Indikator kualitas</td>
+                      <td>Kualitas (100 − 10 × defect rate)</td>
                       {selectedVendors.map((v) => (
                         <td key={v.id}>
                           <strong>{v.quality}/100</strong>
@@ -167,17 +169,19 @@ function Compare({ selectedVendors, toggleVendor, vendors, setPage, notify }) {
                       ))}
                     </tr>
                     <tr>
-                      <td>Status verifikasi</td>
+                      <td>Kriteria teknis</td>
                       {selectedVendors.map((v) => (
                         <td key={v.id}>
                           {v.verified ? (
                             <span className='verified-label'>
-                              <i className='bi bi-patch-check-fill'></i>{' '}
-                              Terverifikasi
+                              <i className='bi bi-patch-check-fill'></i> Risiko
+                              rendah
                             </span>
                           ) : (
                             <span className='status-badge pending'>
-                              Perlu verifikasi
+                              {v.tags.length > 1
+                                ? `Gagal: ${v.tags.slice(1).join(', ')}`
+                                : 'Perlu ditinjau'}
                             </span>
                           )}
                         </td>

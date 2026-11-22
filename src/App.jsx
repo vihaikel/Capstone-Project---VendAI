@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { getCategories, getVendors } from './api.js';
 import Procurement from './pages/Procurement.jsx';
 import Compare from './pages/Compare.jsx';
 import Vendors from './pages/Vendors.jsx';
@@ -9,103 +10,11 @@ import Metric from './components/Metric.jsx';
 import VendorLogo from './components/VendorLogo.jsx';
 import StatusBadge from './components/StatusBadge.jsx';
 
-const vendorsSeed = [
-  {
-    id: 1,
-    name: 'Sumber Makmur Supply',
-    category: 'Bahan baku',
-    initials: 'SM',
-    color: 'mint',
-    rating: 4.9,
-    score: 96,
-    price: 18500000,
-    delivery: '2–3 hari',
-    onTime: 98,
-    quality: 96,
-    location: 'Jakarta Selatan',
-    verified: true,
-    tags: ['Harga kompetitif', 'Pengiriman cepat'],
-    description:
-      'Pemasok bahan baku dan kebutuhan operasional untuk bisnis F&B dengan rekam jejak pengiriman konsisten.',
-  },
-  {
-    id: 2,
-    name: 'Prima Niaga Indonesia',
-    category: 'Perlengkapan',
-    initials: 'PN',
-    color: 'blue',
-    rating: 4.8,
-    score: 91,
-    price: 17200000,
-    delivery: '3–4 hari',
-    onTime: 94,
-    quality: 93,
-    location: 'Tangerang',
-    verified: true,
-    tags: ['Harga terbaik', 'Pilihan ekonomis'],
-    description:
-      'Distributor perlengkapan usaha dengan pilihan produk luas dan penawaran harga yang fleksibel.',
-  },
-  {
-    id: 3,
-    name: 'NusaLogistik Partner',
-    category: 'Logistik',
-    initials: 'NL',
-    color: 'purple',
-    rating: 4.7,
-    score: 88,
-    price: 19800000,
-    delivery: '1–2 hari',
-    onTime: 97,
-    quality: 90,
-    location: 'Bekasi',
-    verified: true,
-    tags: ['Pengiriman tercepat', 'Layanan responsif'],
-    description:
-      'Mitra distribusi dengan jangkauan pengiriman regional dan layanan pemenuhan pesanan cepat.',
-  },
-  {
-    id: 4,
-    name: 'Berkah Jaya Trading',
-    category: 'Bahan baku',
-    initials: 'BJ',
-    color: 'orange',
-    rating: 4.5,
-    score: 82,
-    price: 16400000,
-    delivery: '5–6 hari',
-    onTime: 88,
-    quality: 89,
-    location: 'Depok',
-    verified: false,
-    tags: ['Biaya rendah', 'Perlu verifikasi'],
-    description:
-      'Pemasok lokal dengan harga dasar menarik, perlu pengecekan dokumen dan konsistensi pengiriman.',
-  },
-  {
-    id: 5,
-    name: 'Cipta Usaha Mandiri',
-    category: 'Perlengkapan',
-    initials: 'CU',
-    color: 'pink',
-    rating: 4.6,
-    score: 85,
-    price: 19100000,
-    delivery: '2–4 hari',
-    onTime: 92,
-    quality: 95,
-    location: 'Jakarta Timur',
-    verified: true,
-    tags: ['Kualitas unggul', 'Garansi produk'],
-    description:
-      'Penyedia perlengkapan operasional yang menonjolkan kontrol kualitas dan dukungan purna jual.',
-  },
-];
 const initialRequests = [
   {
     id: 'PR-2026-014',
-    title: 'Pengadaan bahan baku bulanan',
-    category: 'Bahan baku',
+    title: 'Kain terry untuk handuk custom',
+    category: 'Bahan Baku',
     budget: 20000000,
     date: '28 Okt 2026',
     status: 'Menunggu review',
@@ -113,8 +22,8 @@ const initialRequests = [
   },
   {
     id: 'PR-2026-013',
-    title: 'Perlengkapan outlet baru',
-    category: 'Perlengkapan',
+    title: 'Produksi sajadah custom pernikahan',
+    category: 'Kustomisasi & Produksi',
     budget: 12000000,
     date: '25 Okt 2026',
     status: 'Dalam proses',
@@ -122,8 +31,8 @@ const initialRequests = [
   },
   {
     id: 'PR-2026-012',
-    title: 'Jasa pengiriman area Jabodetabek',
-    category: 'Logistik',
+    title: 'Box hampers & kartu ucapan',
+    category: 'Packaging',
     budget: 8000000,
     date: '21 Okt 2026',
     status: 'Selesai',
@@ -148,45 +57,73 @@ const navItems = [
 
 function App() {
   const [page, setPage] = useState('overview');
-  const [vendors, setVendors] = useState(vendorsSeed);
-  const [selected, setSelected] = useState([1, 2, 3]);
+  const [vendors, setVendors] = useState([]);
+  const [vendorTotal, setVendorTotal] = useState(0);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [selected, setSelected] = useState([]);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('Semua kategori');
   const [sort, setSort] = useState('score');
-  const [budget, setBudget] = useState('20000000');
-  const [need, setNeed] = useState('Bahan baku');
+  const [budget, setBudget] = useState('12000000');
+  const [need, setNeed] = useState('Kustomisasi & Produksi');
   const [priority, setPriority] = useState('Seimbang');
-  const [searched, setSearched] = useState(false);
   const [requests, setRequests] = useState(initialRequests);
   const [showRequest, setShowRequest] = useState(false);
   const [toast, setToast] = useState('');
   const [detail, setDetail] = useState(null);
   const [requestTitle, setRequestTitle] = useState(
-    'Pengadaan bahan baku bulanan',
+    'Kain terry untuk handuk custom',
   );
   const [requestBudget, setRequestBudget] = useState('20000000');
-  const [requestCategory, setRequestCategory] = useState('Bahan baku');
+  const [requestCategory, setRequestCategory] = useState('Bahan Baku');
 
-  const filteredVendors = useMemo(() => {
-    let data = vendors.filter(
-      (v) =>
-        (category === 'Semua kategori' || v.category === category) &&
-        (v.name.toLowerCase().includes(query.toLowerCase()) ||
-          v.location.toLowerCase().includes(query.toLowerCase())),
-    );
-    if (sort === 'price') data.sort((a, b) => a.price - b.price);
-    else if (sort === 'rating') data.sort((a, b) => b.rating - a.rating);
-    else data.sort((a, b) => b.score - a.score);
-    return data;
-  }, [vendors, query, category, sort]);
-  const selectedVendors = vendors.filter((v) => selected.includes(v.id));
+  const mainCategories = [...new Set(categories.map((c) => c.main_category))];
+
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch((e) => setLoadError(e.message));
+  }, []);
+
+  // Filter, pencarian, dan sort dijalankan di server (GET /vendors).
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setLoading(true);
+      getVendors({ category, query, sort })
+        .then((d) => {
+          if (cancelled) return;
+          setVendors(d.items);
+          setVendorTotal(d.total);
+          setLoadError('');
+        })
+        .catch((e) => !cancelled && setLoadError(e.message))
+        .finally(() => !cancelled && setLoading(false));
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [category, query, sort]);
+
+  const loadMore = () =>
+    getVendors({ category, query, sort, offset: vendors.length })
+      .then((d) => setVendors((current) => [...current, ...d.items]))
+      .catch((e) => notify(e.message));
+
+  // Vendor terpilih disimpan sebagai objek agar tetap ada walau daftar direktori berganti.
+  const selectedIds = selected.map((v) => v.id);
   const notify = (message) => {
     setToast(message);
     window.setTimeout(() => setToast(''), 2800);
   };
-  const toggleVendor = (id) =>
+  const toggleVendor = (vendor) =>
     setSelected((current) =>
-      current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
+      current.some((v) => v.id === vendor.id)
+        ? current.filter((v) => v.id !== vendor.id)
+        : [...current, vendor],
     );
 
   function saveRequest(e) {
@@ -296,26 +233,34 @@ function App() {
           </div>
         </header>
         <div className='page-content'>
+          {loadError && (
+            <div className='alert alert-warning d-flex align-items-center gap-2'>
+              <i className='bi bi-exclamation-triangle-fill'></i>
+              <span>
+                Data vendor gagal dimuat: {loadError}. Pastikan API
+                (<code>uvicorn app.main:app</code>) dan database berjalan.
+              </span>
+            </div>
+          )}
           {page === 'overview' && (
             <Overview
               setPage={setPage}
               vendors={vendors}
+              vendorTotal={vendorTotal}
               requests={requests}
               notify={notify}
             />
           )}
           {page === 'recommendations' && (
             <Recommendations
+              categories={categories}
               need={need}
               setNeed={setNeed}
               budget={budget}
               setBudget={setBudget}
               priority={priority}
               setPriority={setPriority}
-              searched={searched}
-              setSearched={setSearched}
-              vendors={vendors}
-              selected={selected}
+              selected={selectedIds}
               toggleVendor={toggleVendor}
               setPage={setPage}
               notify={notify}
@@ -324,14 +269,18 @@ function App() {
           )}
           {page === 'vendors' && (
             <Vendors
-              vendors={filteredVendors}
+              vendors={vendors}
+              vendorTotal={vendorTotal}
+              loading={loading}
+              loadMore={loadMore}
+              mainCategories={mainCategories}
               query={query}
               setQuery={setQuery}
               category={category}
               setCategory={setCategory}
               sort={sort}
               setSort={setSort}
-              selected={selected}
+              selected={selectedIds}
               toggleVendor={toggleVendor}
               setDetail={setDetail}
               notify={notify}
@@ -339,7 +288,7 @@ function App() {
           )}
           {page === 'compare' && (
             <Compare
-              selectedVendors={selectedVendors}
+              selectedVendors={selected}
               toggleVendor={toggleVendor}
               vendors={vendors}
               setPage={setPage}
@@ -398,9 +347,9 @@ function App() {
                 value={requestCategory}
                 onChange={(e) => setRequestCategory(e.target.value)}
               >
-                <option>Bahan baku</option>
-                <option>Perlengkapan</option>
-                <option>Logistik</option>
+                {mainCategories.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
               </select>
               <label className='form-label'>Anggaran maksimum (Rp)</label>
               <input
@@ -457,9 +406,10 @@ function App() {
                 </strong>
               </div>
               <div>
-                <span>Rating vendor</span>
+                <span>Risk tier</span>
                 <strong>
-                  <i className='bi bi-star-fill star'></i> {detail.rating}
+                  {detail.riskTier}{' '}
+                  <small>({detail.riskScore.toFixed(3)})</small>
                 </strong>
               </div>
               <div>
@@ -467,21 +417,24 @@ function App() {
                 <strong>{detail.onTime}%</strong>
               </div>
             </div>
-            <h6 className='fw-bold mt-4 mb-3'>Mengapa vendor ini relevan?</h6>
+            <h6 className='fw-bold mt-4 mb-3'>Detail item</h6>
             <ul className='reason-list'>
               <li>
-                <i className='bi bi-check-circle-fill'></i> Memenuhi kategori
-                kebutuhan yang dipilih.
+                <i className='bi bi-check-circle-fill'></i> {detail.subCategory}:{' '}
+                {money(detail.unitPrice)}/{detail.unit}, MOQ {detail.moq}{' '}
+                {detail.unit}.
               </li>
               <li>
-                <i className='bi bi-check-circle-fill'></i> Estimasi biaya dan
-                waktu pengiriman dapat dibandingkan.
+                <i className='bi bi-check-circle-fill'></i> Lead time{' '}
+                {detail.delivery}.
               </li>
               <li>
-                <i className='bi bi-check-circle-fill'></i>{' '}
-                {detail.verified
-                  ? 'Profil vendor telah ditandai terverifikasi pada data demo.'
-                  : 'Perlu verifikasi dokumen sebelum keputusan pembelian.'}
+                <i
+                  className={`bi ${detail.tags.length > 1 ? 'bi-exclamation-circle-fill' : 'bi-check-circle-fill'}`}
+                ></i>{' '}
+                {detail.tags.length > 1
+                  ? `Kriteria teknis gagal: ${detail.tags.slice(1).join(', ')}.`
+                  : 'Lolos semua kriteria teknis.'}
               </li>
             </ul>
             <div className='modal-actions mt-4'>
@@ -494,7 +447,7 @@ function App() {
               <button
                 className='btn btn-primary-custom'
                 onClick={() => {
-                  toggleVendor(detail.id);
+                  toggleVendor(detail);
                   setDetail(null);
                   notify('Daftar perbandingan diperbarui.');
                 }}

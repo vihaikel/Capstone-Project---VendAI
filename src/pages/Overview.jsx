@@ -4,7 +4,7 @@ import Metric from '../components/Metric.jsx';
 import VendorLogo from '../components/VendorLogo.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
-function Overview({ setPage, vendors, requests, notify }) {
+function Overview({ setPage, vendors, vendorTotal, requests, notify }) {
   return (
     <>
       <PageHeader
@@ -81,10 +81,10 @@ function Overview({ setPage, vendors, requests, notify }) {
         <Metric
           icon='bi-buildings'
           color='blue'
-          label='Total vendor'
-          value={vendors.length}
-          trend='+2 vendor'
-          note='dibanding bulan lalu'
+          label='Total item vendor'
+          value={vendorTotal.toLocaleString('id-ID')}
+          trend='database'
+          note='vendor × produk/jasa'
         />
         <Metric
           icon='bi-stars'
@@ -117,7 +117,7 @@ function Overview({ setPage, vendors, requests, notify }) {
             <div className='panel-heading'>
               <div>
                 <h3>Rekomendasi unggulan</h3>
-                <p>Vendor dengan skor kecocokan tertinggi.</p>
+                <p>Vendor dengan risiko terendah.</p>
               </div>
               <button
                 className='text-link'
@@ -126,16 +126,16 @@ function Overview({ setPage, vendors, requests, notify }) {
                 Lihat semua <i className='bi bi-arrow-up-right'></i>
               </button>
             </div>
-            {vendors
-              .slice(0, 3)
+            {[...vendors]
               .sort((a, b) => b.score - a.score)
+              .slice(0, 3)
               .map((v, i) => (
                 <div className='featured-vendor' key={v.id}>
                   <VendorLogo vendor={v} />
                   <div className='featured-info'>
                     <strong>{v.name}</strong>
                     <span>
-                      {v.category} · {v.location}
+                      {v.subCategory} · {v.location}
                     </span>
                     <div className='mini-progress'>
                       <div style={{ width: `${v.score}%` }}></div>
