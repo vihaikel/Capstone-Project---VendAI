@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Tutorial Penggunaan VendAI</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  :root { --blue:#2563eb; --ink:#0f172a; --muted:#475569; --line:#e2e8f0; --soft:#f1f5f9; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: var(--ink); font-size: 10.5pt; line-height: 1.55; margin: 0; background:#fff; }
+  h1 { font-size: 26pt; margin: 0 0 6px; }
+  h2 { font-size: 16pt; color: var(--blue); border-bottom: 2px solid var(--line); padding-bottom: 4px; margin: 28px 0 10px; break-after: avoid; }
+  h3 { font-size: 12.5pt; margin: 18px 0 6px; break-after: avoid; }
+  p, li { margin: 4px 0; }
+  code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size: 9.5pt; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 10px 12px; border-radius: 6px; font-size: 9pt; white-space: pre-wrap; break-inside: avoid; }
+  pre code { background: none; padding: 0; color: inherit; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 9.5pt; break-inside: avoid; }
+  th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  figure { margin: 10px 0 16px; break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid var(--line); border-radius: 6px; }
+  figcaption { font-size: 9pt; color: var(--muted); text-align: center; margin-top: 4px; }
+  .cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; break-after: page; }
+  .cover .tag { color: var(--blue); font-weight: 700; letter-spacing: 2px; font-size: 10pt; }
+  .cover .sub { font-size: 13pt; color: var(--muted); margin-bottom: 24px; }
+  .box { border: 1px solid var(--line); border-left: 4px solid var(--blue); background: #eff6ff; padding: 10px 14px; border-radius: 6px; margin: 10px 0; break-inside: avoid; }
+  .box.warn { border-left-color: #f59e0b; background: #fffbeb; }
+  .access td:first-child { width: 34%; font-weight: 600; }
+  .toc li { margin: 2px 0; }
+  .pb { break-before: page; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="tag">CAPSTONE PROJECT · DICODING GEN AI BOOTCAMP</div>
+  <h1>Tutorial Penggunaan VendAI</h1>
+  <div class="sub">Sistem Rekomendasi Vendor Berbasis Risiko untuk Toko Souvenir &amp; Hampers Pernikahan</div>
+  <table class="access">
+    <tr><th colspan="2">Informasi Akses Aplikasi</th></tr>
+    <tr><td>Alamat aplikasi (lokal)</td><td><code>http://localhost:5173</code></td></tr>
+    <tr><td>Username</td><td><b>Tidak diperlukan</b></td></tr>
+    <tr><td>Password</td><td><b>Tidak diperlukan</b></td></tr>
+    <tr><td>Mode akun</td><td>Demo: langsung masuk sebagai profil contoh <i>Gulamin Halim – Procurement Manager</i></td></tr>
+    <tr><td>Dokumentasi API (Swagger)</td><td><code>http://127.0.0.1:8000/docs</code></td></tr>
+  </table>
+  <h3>Daftar isi</h3>
+  <ol class="toc">
+    <li>Tentang VendAI</li>
+    <li>Informasi akses</li>
+    <li>Menjalankan aplikasi</li>
+    <li>Mengenal tampilan</li>
+    <li>Halaman Ringkasan</li>
+    <li>Halaman Rekomendasi AI</li>
+    <li>Halaman Direktori vendor</li>
+    <li>Halaman Perbandingan</li>
+    <li>Halaman Pengadaan</li>
+    <li>Skenario lengkap: dari kebutuhan sampai permintaan pengadaan</li>
+    <li>Arti istilah dan skor</li>
+    <li>Keterbatasan versi saat ini</li>
+    <li>Troubleshooting</li>
+  </ol>
+</section>
+
+<h2>1. Tentang VendAI</h2>
+<p>VendAI membantu toko souvenir &amp; hampers pernikahan (handuk, sajadah, t-shirt printing, bantal custom) memilih vendor <b>bahan baku</b>, <b>kustomisasi &amp; produksi</b>, dan <b>packaging</b>. Setiap vendor dinilai dari dua sisi:</p>
+<ul>
+  <li><b>Faktor operasional</b>: probabilitas risiko dari model machine learning (<i>risk score</i>).</li>
+  <li><b>Faktor teknis</b>: aturan bisnis pada ketepatan pengiriman, tingkat cacat produk, lead time, dan riwayat gangguan.</li>
+</ul>
+<p>Gabungan keduanya menghasilkan <b>Risk Tier</b> (Rendah / Sedang / Tinggi). Saat Anda mencari rekomendasi, vendor disaring sesuai kebutuhan (kategori, jumlah, anggaran, sisa hari menuju acara) lalu diurutkan berdasarkan skor gabungan risiko, harga, dan lead time.</p>
+
+<h2>2. Informasi Akses</h2>
+<div class="box">
+  <b>Aplikasi tidak memerlukan username maupun password.</b> VendAI berjalan dalam mode demo tanpa halaman login. Setelah aplikasi dijalankan, cukup buka <code>http://localhost:5173</code> di browser dan Anda langsung masuk ke workspace sebagai profil contoh <i>Gulamin Halim (Procurement Manager)</i>.
+</div>
+<table class="access">
+  <tr><td>Frontend (website)</td><td><code>http://localhost:5173</code></td></tr>
+  <tr><td>Backend API</td><td><code>http://127.0.0.1:8000</code></td></tr>
+  <tr><td>Dokumentasi API interaktif</td><td><code>http://127.0.0.1:8000/docs</code></td></tr>
+  <tr><td>Browser yang disarankan</td><td>Google Chrome / Microsoft Edge versi terbaru, layar desktop</td></tr>
+</table>
+
+<h2>3. Menjalankan Aplikasi</h2>
+<p>VendAI dijalankan di komputer lokal. Langkah lengkap ada di <code>README.md</code>; berikut ringkasannya.</p>
+<h3>Prasyarat</h3>
+<table>
+  <tr><th>Kebutuhan</th><th>Versi</th><th>Kegunaan</th></tr>
+  <tr><td>Python</td><td>3.11</td><td>API, seeding database, notebook</td></tr>
+  <tr><td>Node.js + npm</td><td>18+</td><td>Frontend (React + Vite)</td></tr>
+  <tr><td>PostgreSQL</td><td>12+</td><td>Database vendor</td></tr>
+  <tr><td>Gemini API key</td><td>—</td><td>Opsional, hanya untuk endpoint penjelasan AI</td></tr>
+</table>
+<h3>Langkah</h3>
+<ol>
+  <li><b>Pasang dependency Python</b> (gunakan environment Python 3.11):
+<pre><code>pip install -r requirements.txt</code></pre></li>
+  <li><b>Siapkan database</b>. Artefak model di <code>models/v1/</code> sudah tersedia di repository.
+<pre><code>createdb -U postgres vendai
+psql -U postgres -d vendai -f db/schema.sql
+# PowerShell:
+$env:DATABASE_URL="postgresql://user:pass@localhost:5432/vendai"; python db/seed.py</code></pre></li>
+  <li><b>Buat file <code>api_key.env</code></b> di root proyek:
+<pre><code>DATABASE_URL=postgresql://user:pass@localhost:5432/vendai
+GEMINI_API_KEY=isi_api_key_anda</code></pre></li>
+  <li><b>Jalankan API</b> (dari root proyek, terminal pertama):
+<pre><code>uvicorn app.main:app --reload
+# jika perintah uvicorn tidak dikenal, jalankan lewat Python 3.11 Anda:
+python -m uvicorn app.main:app --reload</code></pre></li>
+  <li><b>Jalankan frontend</b> (terminal kedua):
+<pre><code>npm install
+npm run start:dev</code></pre></li>
+  <li>Buka <code>http://localhost:5173</code> di browser.</li>
+</ol>
+<div class="box warn">API dan frontend harus berjalan <b>bersamaan</b>. Frontend mengambil data vendor dari database melalui API; jika API mati, muncul peringatan <i>"Data vendor gagal dimuat"</i>.</div>
+
+<h2 class="pb">4. Mengenal Tampilan</h2>
+<ul>
+  <li><b>Sidebar kiri (Workspace)</b>: menu ke lima halaman, yaitu <b>Ringkasan</b>, <b>Rekomendasi AI</b>, <b>Direktori vendor</b>, <b>Perbandingan</b>, dan <b>Pengadaan</b>. Di bagian bawah ada kartu bantuan dan profil pengguna demo.</li>
+  <li><b>Topbar</b>: <i>breadcrumb</i> halaman aktif, status <i>Workspace aktif</i>, ikon notifikasi, dan avatar.</li>
+  <li><b>Notifikasi kecil (toast)</b> muncul di pojok layar setiap kali sebuah aksi berhasil, misalnya setelah rekomendasi dibuat.</li>
+</ul>
+
+<h2>5. Halaman Ringkasan</h2>
+<p>Halaman pertama yang tampil saat aplikasi dibuka.</p>
+<figure><img src="img/01-ringkasan.png" alt="Halaman Ringkasan"><figcaption>Gambar 1. Halaman Ringkasan</figcaption></figure>
+<ol>
+  <li>Lihat kartu <b>Ringkasan bisnis</b>: total item vendor di database, rekomendasi tersedia, potensi penghematan, dan jumlah permintaan aktif.</li>
+  <li>Gulir ke bawah untuk melihat <b>Rekomendasi unggulan</b> (3 vendor dengan skor tertinggi) dan <b>Aktivitas pengadaan</b> terbaru.</li>
+  <li>Klik <b>Mulai rekomendasi AI</b> atau <b>Temukan vendor</b> untuk langsung ke halaman Rekomendasi AI.</li>
+</ol>
+
+<h2 class="pb">6. Halaman Rekomendasi AI</h2>
+<p>Fitur utama VendAI: menyusun shortlist vendor sesuai kebutuhan pengadaan Anda.</p>
+<h3>6.1 Mengisi kriteria</h3>
+<figure><img src="img/02-rekomendasi-form.png" alt="Form kriteria rekomendasi"><figcaption>Gambar 2. Panel "Kebutuhan pengadaan"</figcaption></figure>
+<ol>
+  <li><b>Kategori kebutuhan</b>: pilih Bahan Baku, Kustomisasi &amp; Produksi, atau Packaging.</li>
+  <li><b>Produk / jasa</b>: pilih sub-kategori, misalnya <i>Produksi Handuk Custom</i>. Satuan (pcs, kg, meter) menyesuaikan otomatis.</li>
+  <li><b>Jumlah pesanan</b>: isi jumlah yang dibutuhkan, misalnya <code>300</code>.</li>
+  <li><b>Anggaran maksimum</b>: total anggaran dalam Rupiah, misalnya <code>12000000</code>.</li>
+  <li><b>Sisa hari menuju acara</b>: misalnya <code>21</code>. Kosongkan bila tidak ada deadline.</li>
+  <li><b>Prioritas utama</b>: pilih salah satu.
+    <ul>
+      <li><i>Seimbang</i>: urutan default dari skor risiko, harga, dan lead time.</li>
+      <li><i>Harga terendah</i>: total biaya paling murah di atas.</li>
+      <li><i>Kualitas</i>: tingkat cacat (defect rate) terendah di atas.</li>
+      <li><i>Pengiriman tercepat</i>: lead time terpendek di atas.</li>
+    </ul>
+  </li>
+  <li>Klik <b>Generate rekomendasi</b>. Tombol aktif bila produk, jumlah, dan anggaran sudah terisi.</li>
+</ol>
+<div class="box">Vendor dengan Risk Tier <b>Tinggi</b> otomatis dikecualikan. Vendor juga disaring berdasarkan MOQ (minimal order), anggaran, kapasitas produksi, dan deadline.</div>
+
+<h3>6.2 Membaca hasil rekomendasi</h3>
+<figure><img src="img/03-rekomendasi-hasil.png" alt="Hasil rekomendasi"><figcaption>Gambar 3. Shortlist vendor hasil rekomendasi</figcaption></figure>
+<p>Setiap kartu vendor menampilkan:</p>
+<ul>
+  <li><b>Peringkat dan ID vendor</b> (misalnya <i>#1 SUP_02808</i>), label <i>Risiko rendah</i> bila tier-nya Rendah, sub-kategori, dan jenis vendor.</li>
+  <li><b>Skor</b> (0–100) di kanan atas: makin tinggi makin direkomendasikan.</li>
+  <li><b>Total biaya</b> untuk jumlah pesanan Anda beserta harga satuan, <b>Lead time</b>, dan <b>Risk tier</b> beserta persentase ketepatan waktu.</li>
+  <li><b>Label</b> di bawah kartu: label pertama adalah tier risiko, label berikutnya adalah kriteria teknis yang <b>tidak lolos</b> (misalnya <i>Defect_Rate</i>).</li>
+</ul>
+<p>Aksi pada kartu:</p>
+<ul>
+  <li><b>Bandingkan</b>: memasukkan vendor ke daftar perbandingan (tombol berubah menjadi <i>Dipilih</i>). Klik lagi untuk mengeluarkan.</li>
+  <li><b>Detail vendor</b>: membuka jendela detail.</li>
+  <li><b>Bandingkan (n)</b> di atas daftar: membuka halaman Perbandingan.</li>
+</ul>
+<p>Jika muncul <i>"Tidak ada vendor yang cocok"</i>, naikkan anggaran, kurangi jumlah, atau perpanjang deadline.</p>
+
+<h3>6.3 Detail vendor</h3>
+<figure><img src="img/04-detail-vendor.png" alt="Detail vendor"><figcaption>Gambar 4. Jendela detail vendor</figcaption></figure>
+<p>Jendela detail menampilkan AI Match Score, Risk tier beserta nilai risk score, ketepatan waktu, harga satuan, MOQ, lead time, dan kriteria teknis yang gagal. Klik <b>Tambah/keluarkan dari perbandingan</b> untuk mengatur daftar perbandingan, atau <b>Tutup</b> untuk kembali.</p>
+
+<h2 class="pb">7. Halaman Direktori vendor</h2>
+<p>Berisi seluruh katalog vendor × produk/jasa dari database (36.065 item).</p>
+<figure><img src="img/05-direktori.png" alt="Direktori vendor"><figcaption>Gambar 5. Direktori vendor</figcaption></figure>
+<ol>
+  <li><b>Cari</b>: ketik ID vendor (misalnya <code>SUP_02808</code>) atau kata pada deskripsi item (misalnya <code>handuk</code>) di kolom pencarian.</li>
+  <li><b>Filter kategori</b>: pilih <i>Semua kategori</i>, Bahan Baku, Kustomisasi &amp; Produksi, atau Packaging.</li>
+  <li><b>Urutkan</b>: <i>Risiko terendah</i>, <i>Harga satuan terendah</i>, atau <i>Lead time tercepat</i>.</li>
+  <li>Klik ikon <b>mata</b> untuk melihat detail vendor, atau ikon <b>kotak plus</b> untuk memilih vendor ke daftar perbandingan.</li>
+  <li>Daftar menampilkan 50 item pertama; klik <b>Muat lebih banyak</b> di bawah tabel untuk menambah data.</li>
+  <li>Tombol <b>Vendor dipilih: n</b> di bawah halaman menunjukkan jumlah vendor yang siap dibandingkan.</li>
+</ol>
+
+<h2 class="pb">8. Halaman Perbandingan</h2>
+<p>Membandingkan vendor terpilih secara berdampingan. Pilih <b>minimal 2 vendor</b> dari Rekomendasi AI atau Direktori vendor terlebih dahulu.</p>
+<figure><img src="img/06-perbandingan.png" alt="Perbandingan vendor"><figcaption>Gambar 6. Tabel perbandingan vendor</figcaption></figure>
+<ol>
+  <li>Buka menu <b>Perbandingan</b>. Jika vendor yang dipilih kurang dari 2, klik <b>Buka direktori vendor</b> untuk memilih.</li>
+  <li>Gunakan dropdown di kanan atas untuk menampilkan <i>Semua metrik</i>, <i>Metrik komersial</i> (harga satuan, lead time), atau <i>Performa vendor</i> (skor, risk tier, ketepatan waktu, kualitas, kriteria teknis).</li>
+  <li>Sel berwarna hijau bertanda <i>Terendah</i> menunjukkan harga satuan termurah.</li>
+  <li>Baris <b>Rekomendasi</b> menandai vendor dengan skor tertinggi sebagai <i>Pilihan unggulan</i>; sisanya <i>Alternatif</i>.</li>
+  <li>Klik <b>Hapus</b> di bawah nama vendor untuk mengeluarkannya dari perbandingan.</li>
+</ol>
+
+<h2 class="pb">9. Halaman Pengadaan</h2>
+<p>Mengelola permintaan pengadaan (procurement request).</p>
+<figure><img src="img/07-pengadaan.png" alt="Halaman Pengadaan"><figcaption>Gambar 7. Daftar permintaan pengadaan</figcaption></figure>
+<ol>
+  <li>Lihat ringkasan <b>Total permintaan</b>, <b>Menunggu / proses</b>, dan <b>Selesai</b>.</li>
+  <li>Gunakan dropdown status untuk menyaring: <i>Semua status</i>, <i>Menunggu review</i>, <i>Dalam proses</i>, atau <i>Selesai</i>.</li>
+  <li>Klik tombol panah di ujung baris untuk melihat ringkasan permintaan.</li>
+  <li>Klik <b>Buat permintaan</b> untuk menambah permintaan baru:</li>
+</ol>
+<figure><img src="img/08-buat-permintaan.png" alt="Form buat permintaan"><figcaption>Gambar 8. Form "Buat permintaan pengadaan"</figcaption></figure>
+<ol start="5">
+  <li>Isi <b>Nama kebutuhan</b>, pilih <b>Kategori</b>, dan isi <b>Anggaran maksimum (Rp)</b>.</li>
+  <li>Klik <b>Buat permintaan</b>. Permintaan baru muncul paling atas dengan status <i>Menunggu review</i>.</li>
+</ol>
+
+<h2 class="pb">10. Skenario Lengkap</h2>
+<p><b>Kasus:</b> toko membutuhkan <b>300 pcs handuk custom</b> untuk acara pernikahan 21 hari lagi, dengan anggaran maksimum Rp12.000.000.</p>
+<ol>
+  <li>Buka <code>http://localhost:5173</code> (tanpa login), lalu klik <b>Mulai rekomendasi AI</b> di halaman Ringkasan.</li>
+  <li>Isi kriteria: Kategori <i>Kustomisasi &amp; Produksi</i>, Produk <i>Produksi Handuk Custom</i>, Jumlah <code>300</code>, Anggaran <code>12000000</code>, Sisa hari <code>21</code>, Prioritas <i>Seimbang</i>.</li>
+  <li>Klik <b>Generate rekomendasi</b>. VendAI menampilkan 5 vendor teratas; peringkat #1 pada contoh ini adalah <i>SUP_02808</i> (skor 96, total biaya Rp3.750.000, lead time 3 hari, Risk tier Rendah), disusul <i>SUP_05059</i> (skor 95, Rp4.050.000).</li>
+  <li>Klik <b>Detail vendor</b> pada kandidat teratas untuk memeriksa MOQ dan kriteria teknis.</li>
+  <li>Klik <b>Bandingkan</b> pada 2–3 kandidat, lalu klik <b>Bandingkan (n)</b>.</li>
+  <li>Di halaman Perbandingan, periksa harga, ketepatan waktu, kualitas, dan kriteria teknis. Tentukan <i>Pilihan unggulan</i>.</li>
+  <li>Buka <b>Pengadaan</b> → <b>Buat permintaan</b>, isi <i>"Produksi handuk custom 300 pcs"</i>, kategori <i>Kustomisasi &amp; Produksi</i>, anggaran <code>12000000</code>, lalu simpan.</li>
+  <li>Verifikasi penawaran dan dokumen vendor secara langsung sebelum menyetujui pembelian.</li>
+</ol>
+
+<h2>11. Arti Istilah dan Skor</h2>
+<table>
+  <tr><th>Istilah</th><th>Arti</th></tr>
+  <tr><td>Risk score</td><td>Probabilitas vendor berisiko menurut model machine learning (0–1; makin kecil makin aman).</td></tr>
+  <tr><td>Risk Tier</td><td><b>Rendah</b>: aman dipilih. <b>Sedang</b>: perlu ditinjau. <b>Tinggi</b>: tidak direkomendasikan dan otomatis dikecualikan dari rekomendasi. Ditentukan dari gabungan risk score dan aturan teknis.</td></tr>
+  <tr><td>Skor / AI Match Score</td><td>Pada Direktori &amp; Perbandingan: (1 − risk score) × 100. Pada Rekomendasi AI: skor gabungan risiko, harga, dan lead time (0–100).</td></tr>
+  <tr><td>Kualitas</td><td>100 − 10 × defect rate (persentase produk cacat).</td></tr>
+  <tr><td>Ketepatan waktu</td><td>Persentase pengiriman tepat waktu (On Time Delivery Rate).</td></tr>
+  <tr><td>Kriteria teknis gagal</td><td>Aturan bisnis yang tidak dipenuhi vendor, misalnya <i>Defect_Rate</i>, <i>On_Time_Delivery_Rate</i>, <i>Lead_Time_Days</i>, <i>Previous_Disruptions</i>.</td></tr>
+  <tr><td>MOQ</td><td>Minimum Order Quantity: jumlah pesanan minimal yang diterima vendor.</td></tr>
+  <tr><td>Lead time</td><td>Waktu tunggu dari pemesanan sampai barang siap (hari).</td></tr>
+</table>
+
+<h2>12. Keterbatasan Versi Saat Ini</h2>
+<ul>
+  <li>Belum ada sistem login/akun; semua pengguna memakai profil demo yang sama.</li>
+  <li>Data di halaman <b>Pengadaan</b> masih tersimpan sementara di browser dan <b>hilang saat halaman di-refresh</b>.</li>
+  <li>Kartu <i>Rekomendasi tersedia</i> dan <i>Potensi penghematan</i> di halaman Ringkasan masih berisi angka contoh.</li>
+  <li>Tombol <i>Tambah vendor</i>, <i>Lihat panduan</i>, notifikasi, dan <i>Simpan hasil evaluasi</i> masih berupa placeholder (hanya menampilkan pesan).</li>
+  <li>Hasil rekomendasi dan daftar perbandingan direset bila halaman di-refresh.</li>
+</ul>
+
+<h2>13. Troubleshooting</h2>
+<table>
+  <tr><th>Gejala</th><th>Penyebab &amp; solusi</th></tr>
+  <tr><td>Peringatan kuning <i>"Data vendor gagal dimuat"</i></td><td>API atau database belum berjalan. Jalankan <code>uvicorn app.main:app</code> dari root proyek dan pastikan PostgreSQL aktif serta <code>DATABASE_URL</code> di <code>api_key.env</code> benar.</td></tr>
+  <tr><td><code>uvicorn: command not found</code></td><td>uvicorn belum terpasang di Python yang aktif. Aktifkan environment Python 3.11 proyek, lalu jalankan <code>python -m uvicorn app.main:app</code>.</td></tr>
+  <tr><td>Error <i>address already in use</i> (port 8000 / 5173)</td><td>API atau frontend sudah berjalan di terminal lain. Pakai yang sudah berjalan, atau hentikan dulu sebelum menjalankan ulang.</td></tr>
+  <tr><td>Halaman tidak terbuka di <code>localhost:5173</code></td><td>Frontend belum dijalankan. Jalankan <code>npm install</code> lalu <code>npm run start:dev</code>.</td></tr>
+  <tr><td>Dropdown kategori kosong</td><td>Database belum diisi. Jalankan <code>db/schema.sql</code> dan <code>python db/seed.py</code>.</td></tr>
+  <tr><td>Error 422</td><td>Input tidak valid (tipe salah atau nilai di luar rentang). Periksa kembali isian form.</td></tr>
+  <tr><td>Error 503</td><td>Database tidak dapat diakses, <code>DATABASE_URL</code> kosong, atau artefak model tidak ditemukan.</td></tr>
+  <tr><td>Error 502</td><td>Pemanggilan Gemini gagal (API key salah atau kuota habis); hanya berdampak pada fitur penjelasan AI.</td></tr>
+  <tr><td><code>ModuleNotFoundError: No module named '_loss'</code></td><td>Versi scikit-learn tidak cocok. Gunakan Python 3.11 dan scikit-learn 1.7.0 sesuai <code>requirements.txt</code>.</td></tr>
+</table>
+
+<p style="margin-top:24px;color:var(--muted);font-size:9pt;">© 2026 VendAI · Vendor intelligence, made simple.</p>
+</body>
+</html>
