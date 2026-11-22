@@ -3,8 +3,9 @@ from typing import Literal, Any
 
 # Request frontend
 class RiskRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
+    Supplier_ID: str | None = None
     Financial_Stability_Score: float | None = Field(default=None, ge=0, le=100)
     On_Time_Delivery_Rate: float | None = Field(default=None, ge=0, le=100)
     Defect_Rate: float | None = Field(default=None, ge=0, le=10)
@@ -15,20 +16,22 @@ class RiskRequest(BaseModel):
     Previous_Disruptions: float | None = Field(default=None, ge=0, le=10)
 
 class RiskResponse(BaseModel):
+    Supplier_ID: str | None = None
     Risk_Score: float
     Operasional_Buruk: bool
     Teknis_Buruk: bool
-    Kriteria_Teknis_Gagal: str
+    Kriteria_Teknis_Gagal: str | None = None
     Risk_Tier: Literal['Rendah', 'Sedang', 'Tinggi']
 
 class ProcurementRequest(BaseModel):
-    main_category: str
-    sub_category: str
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, allow_inf_nan=False)
+    main_category: str = Field(min_length=1)
+    sub_category: str = Field(min_length=1)
     quantity: float = Field(gt=0)
     budget: float = Field(gt=0)
-    deadline_days: int | None = Field(default=None, gt=0)
+    deadline_days: int | None = Field(default=None, gt=3)
 
-class VendorExplanation(BaseModel):
+class VendorExplaination(BaseModel):
     Rank: int
     Supplier_ID: str
 
@@ -56,7 +59,7 @@ class VendorExplanation(BaseModel):
 
 class GenerativeRequest(BaseModel):
     procurement_request: ProcurementRequest
-    supplier: list[VendorExplanation] = Field(min_length=1)
+    supplier: list[VendorExplaination] = Field(min_length=1)
     question: str | None = None
 
 class RecommendRequest(BaseModel):
@@ -71,3 +74,26 @@ class RecommendRequest(BaseModel):
 class GenerativeResponse(BaseModel):
     explanation: str
     model: str
+
+class RecommendationRequest(ProcurementRequest):
+    vendor_type: str | None = None
+    top_k: int = Field(default=5, ge=1, le=10)
+
+class RecommendationResponse(BaseModel):
+    total: int
+    suppliers: list[VendorExplaination]
+
+class ProcurementFlowRequest(RecommendationRequest):
+    question: str | None = None
+
+class ProcurementFlowResponse(BaseModel):
+    total: int
+    suppliers: list[VendorExplaination]
+    explanation: str | None = None
+    model: str | None = None
+    explanation_status: Literal[
+        "success",
+        "unavailable",
+        "failed",
+        "no_recommendations"
+    ]
