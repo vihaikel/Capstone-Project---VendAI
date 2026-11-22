@@ -18,3 +18,4 @@ models/v1/
 
 node_modules/
 dist/
+test/

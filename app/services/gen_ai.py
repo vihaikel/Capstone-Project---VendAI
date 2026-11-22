@@ -1,39 +1,45 @@
 import os
 import json
+import logging
+import time
+
 from pathlib import Path
-from functools import lru_cache
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+logger = logging.getLogger(__name__)
+
 base_dir = Path(__file__).resolve().parents[2]
 env_path = base_dir / "api_key.env"
 load_dotenv(env_path)
-model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
-@lru_cache(maxsize=1)
-def model_gemini():
-    api_key = os.getenv("GEMINI_API_KEY")
-    return genai.Client(api_key = api_key)
+api_key = os.getenv("GEMINI_API_KEY")
+model_name = os.getenv("GEMINI_MODEL")
+
+if not api_key:
+    raise RuntimeError("GEMINI_API_KEY belum dikonfigurasi")
+if not model_name:
+    raise RuntimeError("GEMINI_MODEL belum dikonfigurasi")
+
+client = genai.Client(api_key = api_key)
+
 
 def generate_explaination(supplier_data: list[dict], procurement_request: dict, question: str | None = None):
-    client = model_gemini()
     system_instruction = """
     Kamu adaklah asisten AI yang membantu menjelaskan hasil analisis risiko vendor.
     
     Tugasmu adalah menjelaskan hasil rekomendasi dan ranking vendor berdasarkan data yang diberikan.
     
     Aturan:
-    1. Jangan menghitung ulang skor ranking atau Risk_Score. Gunakan data yang diberikan.
-    2. Jangan mengubah urutan ranking vendor. Gunakan urutan yang diberikan.
-    3. Jangan Mengubah Risk_Score atau Risk_Tier. Gunakan data yang diberikan.
-    4. Jangan mengarang informasi yang tidak ada dalam data. Gunakan data yang diberikan.
-    5. Jelaskan alasan vendor berada di ranking tertentu berdasarkan data yang diberikan.
-    6. Jelaskan kelebihan dan kekurangan vendor jika datanya tersedia.
-    7. Jelaskan trade-off jika pengguna memilih vendor alternatif.
-    8. Jika informasi tidak cukup, jelaskan bahwa informasi tidak cukup untuk memberikan penjelasan yang lengkap.
-    9. Gunakan bahasa Indonesia yang jelas dan mudah dipahami.
-    10. Jelaskan secara ringkas dan padat, tidak terlalu panjang.
+    1. Gunakan hanya data yang diberikan.
+    2. Jangan menghitung ulang score atau mengubah ranking.
+    3. Jelaskan mengapa vendor di peringkat pertama menjadi rekomendasi utama.
+    4. Bandingkan harga, lead time, dan risiko antar vendor. 
+    5. Jelaskan trade-off jika user memilih vendor alternatif.
+    6. Jangan mengarang informasi yang tidak tersedia.
+    8. Gunakan bahasa Indonesia secara ringkas dan jelas.
+    9. Maksimal 150 kata
     
     Format jawaban:
     - Ringkasan rekomendasi
@@ -43,25 +49,34 @@ def generate_explaination(supplier_data: list[dict], procurement_request: dict, 
     - Pertimbangan sebelum mengambil keputusan"""
 
     prompt = f"""
-    Berikut data permintaan pengadaan: {json.dumps(procurement_request, indent=2, ensure_ascii=False)}
+    Berikut data permintaan pengadaan: {json.dumps(procurement_request, ensure_ascii=False)}
 
-    Berikut data hasil rekomendasi vendor: {json.dumps(supplier_data, indent=2, ensure_ascii=False)}
+    Berikut data hasil rekomendasi vendor: {json.dumps(supplier_data, ensure_ascii=False)}
 
     Pertanyaan tambahan dari pengguna:
-    {question if question else "Tidak ada pertanyaan tambahan. Berikan penjelasan rekomendasi vendor berdasarkan data yang tersedia."}
-    
-    Berikan jawaban sesuai aturan dan format yang telah diberikan di system_instruction."""
+    {question or "Jelaskan rekomendasi vendor berdasarkan data yang tersedia."}"""
 
-    response = client.models.generate_content(
-        model = model_name,
-        contents = prompt,
-        config = types.GenerateContentConfig(
-            system_instruction = system_instruction,
-            temperature = 0.2
+    start_time = time.perf_counter()
+    try:
+        response = client.models.generate_content(
+            model = model_name,
+            contents = prompt,
+            config = types.GenerateContentConfig(
+                system_instruction = system_instruction,
+                temperature = 0.2,
+                max_output_tokens = 500
+            )
         )
-    )
 
-    if not response.text:
-        raise RuntimeError("Tidak ada jawaban yang dihasilkan oleh model.")
+        duration = time.perf_counter() - start_time
+        logger.info("Response Gemini berhasil. Model: %s | Durasi: %.2f detik", model_name, duration)
+        if not response.text:
+            raise RuntimeError("Gemini tidak menghasilkan jawaban")
 
-    return {"explanation": response.text, "model": model_name}
+        return{"explaination": response.text, "model": model_name}
+
+    except Exception:
+        duration = time.perf_counter() - start_time
+        logger.exception("Response Gemini gagal. Model: %s | Durasi: %.2f detik", model_name, duration)
+
+        raise
